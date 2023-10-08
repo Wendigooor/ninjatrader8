@@ -1,0 +1,341 @@
+#region Using declarations
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Xml.Serialization;
+using NinjaTrader.Cbi;
+using NinjaTrader.Gui;
+using NinjaTrader.Gui.Chart;
+using NinjaTrader.Gui.SuperDom;
+using NinjaTrader.Gui.Tools;
+using NinjaTrader.Data;
+using NinjaTrader.NinjaScript;
+using NinjaTrader.Core.FloatingPoint;
+using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.DrawingTools;
+#endregion
+
+//This namespace holds Strategies in this folder and is required. Do not change it.
+namespace NinjaTrader.NinjaScript.Strategies
+{
+	public class PinBarV3gegege : Strategy
+	{
+		#region Variables
+		private SMA maSlow;
+		private EMA maMedium;
+		private EMA maFast;
+
+		private double open;
+		private double close;
+		private double low;
+		private double high;
+
+		private double slowSMA;
+		private double medmEMA;
+		private double fastEMA;
+
+		private bool bullishPinBar;
+		private bool bearishPinBar;
+
+		private bool fanUpTrend;
+		private bool fanDnTrend;
+
+		private bool bullPierce;
+		private bool bearPierce;
+
+		private bool longEntry;
+		private bool shortEntry;
+
+		private double 	previousStopPrice		= 0;		// previous price used to calculate trailing stop
+		private double 	newStopPrice			= 0;		// Default setting for new price used to calculate trailing stop
+
+		private double profitTrailTriggerInPoints;
+		private double profitTrailOffsetInPoints;
+
+		private bool profitTrailIsTriggered;
+		private bool newStopPriceIsBetter;
+
+		private double  posAvgPrice;
+
+		private int lastBarValueIndex = 1;
+
+		private double newStopAbsolutePrice = 0;
+		private SessionIterator		sessionIterator;
+		private bool exitOnCloseWait;
+		private double				currentPtPrice, currentSlPrice, tickSizeSecondary;
+
+		// Define variables
+private double profitTarget = 50; // Set the desired profit target in ticks
+//private double trailingStopLoss = 20; // Set the desired trailing stop loss value in ticks
+private double highestProfit = 0; // Tracks the highest profit reached
+private double trailStopPrice = 0; // Tracks the trailing stop loss price
+//private double profitTargetTicks = 22;
+//private double trailingStopLossTicks = 2;
+private double highestProfitTicks = 0;
+
+		#endregion
+
+		private int 	BarTraded 			= 0;
+
+		protected override void OnStateChange()
+		{
+			if (State == State.SetDefaults)
+			{
+				Description									= @"Enter the description for your new custom Strategy here.";
+				Name										= "111 ge PinBarV3 OnPriceChange 2222 2222";
+				Calculate									= Calculate.OnEachTick;
+				EntriesPerDirection							= 1;
+				EntryHandling								= EntryHandling.AllEntries;
+				IsExitOnSessionCloseStrategy				= true;
+				ExitOnSessionCloseSeconds					= 30;
+				IsFillLimitOnTouch							= false;
+				MaximumBarsLookBack							= MaximumBarsLookBack.TwoHundredFiftySix;
+				OrderFillResolution							= OrderFillResolution.Standard;
+				Slippage									= 0;
+				StartBehavior								= StartBehavior.WaitUntilFlat;
+				TimeInForce									= TimeInForce.Gtc;
+				TraceOrders									= false;
+				RealtimeErrorHandling						= RealtimeErrorHandling.StopCancelClose;
+				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
+				BarsRequiredToTrade							= 20;
+				// Disable this property for performance gains in Strategy Analyzer optimizations
+				// See the Help Guide for additional information
+				IsInstantiatedOnEachOptimizationIteration	= false;
+
+				Slow		= 25;
+				Medium		= 10;
+				Fast		= 2;
+
+				pinbarConfirmationValue = 0.1;
+
+				stopLossTicks = 70;
+				profitTargetTicks = 55;
+				trailingStopLossTicks = 1;
+			}
+			else if (State == State.Configure)
+			{
+				//SetStopLoss(CalculationMode.Ticks, stopLossTicks);
+				//SetProfitTarget(CalculationMode.Ticks, profitTargetTicks);
+			}
+			/*else if (State == State.Historical)
+			{
+				sessionIterator	= new SessionIterator(Bars);
+			}*/
+			else if (State == State.DataLoaded)
+			{
+				#region init MA and add them to chart
+				maSlow = SMA(Slow);
+				maMedium = EMA(Medium);
+				maFast = EMA(Fast);
+
+				maSlow.Plots[0].Brush = Brushes.SeaGreen;
+				maMedium.Plots[0].Brush = Brushes.AliceBlue;
+				maFast.Plots[0].Brush = Brushes.Goldenrod;
+
+				AddChartIndicator(maSlow);
+				AddChartIndicator(maMedium);
+				AddChartIndicator(maFast);
+				#endregion
+			}
+		}
+
+		protected override void OnBarUpdate()
+		{
+			if (CurrentBar < BarsRequiredToTrade)
+				return;
+
+
+			//SetStopLoss(CalculationMode.Ticks, stopLossTicks);
+			//SetProfitTarget(CalculationMode.Ticks, profitTargetTicks * 5 );
+
+
+			// WORKS with "Tick Replay" only, changed index
+			// WORKS with "Tick Replay" only, changed index
+			// WORKS with "Tick Replay" only, changed index
+			// WORKS with "Tick Replay" only, changed index
+			// WORKS with "Tick Replay" only, changed index
+			// WORKS with "Tick Replay" only, changed index
+
+			// One thing to note is that addressing Close[1] will not return the previous tick during OnEachTick execution,
+			// it will always return the last closed bar.
+			// Close[0] will always return the last tick available.
+
+			// Close[1], maSlow[1] in this case must refer to previous bar, which is closed and cannot be changed
+			lastBarValueIndex = 1;
+
+			// Since our strategy in calculating OnEachTick, OnBarUpdate is invoked every tick, no need to use OnMarketData.
+			// Update trailing stop with last tick value, on each tick
+			// If you are using, say, a 1 minute data series with Calculate.OnEachTick,
+			// Close[1] would refer to the close of the previous 1 minute bar to the one currently forming.
+			// Close[0] would be the current price of the forming bar, based on the tick it's calculating on.
+			//updateTrailingStop( Close[0] );
+
+			#region entry logic
+			maSlow = SMA(Slow);
+			maMedium = EMA(Medium);
+			maFast = EMA(Fast);
+
+
+			// as long as our strategy is calculation OnEachTick, we should use already closed bar for entry decision
+			// maSlow[1] instead of maSlow[0], [0] is a developing (current) bar, and the price is changing on each tick
+			slowSMA = maSlow[lastBarValueIndex];
+			medmEMA = maMedium[lastBarValueIndex];
+			fastEMA = maFast[lastBarValueIndex];
+
+			open = Open[lastBarValueIndex];
+			close = Close[lastBarValueIndex];
+			low = Low[lastBarValueIndex];
+			high = High[lastBarValueIndex];
+
+			bullishPinBar = close > open && open - low > pinbarConfirmationValue * (high - low) || close < open && close - low > pinbarConfirmationValue * (high - low);
+			bearishPinBar = close > open && high - close > pinbarConfirmationValue * (high - low) || close < open && high - open > pinbarConfirmationValue * (high - low);
+
+			fanUpTrend = fastEMA > medmEMA && medmEMA > slowSMA;
+			fanDnTrend = fastEMA < medmEMA && medmEMA < slowSMA;
+
+			bullPierce = low < fastEMA && open > fastEMA && close > fastEMA || low < medmEMA && open > medmEMA && close > medmEMA || low < slowSMA && open > slowSMA && close > slowSMA;
+			bearPierce = high > fastEMA && open < fastEMA && close < fastEMA || high > medmEMA && open < medmEMA && close < medmEMA || high > slowSMA && open < slowSMA && close < slowSMA;
+
+			longEntry = fanUpTrend && bullishPinBar && bullPierce;
+			shortEntry = fanDnTrend && bearishPinBar && bearPierce;
+
+			if (longEntry && Position.MarketPosition == MarketPosition.Flat && CurrentBar > BarTraded && IsFirstTickOfBar) {
+				resetDefaults();
+
+				EnterLong("entry");
+				//currentPtPrice = Close[0] + trailingStopLossTicks * TickSize + profitTargetTicks * TickSize;//Position.AveragePrice + trailingStopLossTicks * TickSize;
+
+				currentPtPrice = Close[0] + profitTargetTicks * TickSize;
+				currentSlPrice = Close[0] - stopLossTicks * TickSize;
+				
+				//ExitLongLimit(currentSlPrice);
+				
+
+				Print("Enter long with price ->" + Close[0]);
+				Print("CurrentPtPrice ->" + currentPtPrice);
+				Print("CurrentSlPrice ->" + currentSlPrice);
+				BarTraded = CurrentBar;
+			}
+
+			if (shortEntry && Position.MarketPosition == MarketPosition.Flat && CurrentBar > BarTraded && IsFirstTickOfBar) {
+				resetDefaults();
+
+				EnterShort("entry");
+				//BarTraded = CurrentBar;
+				
+				currentPtPrice = Close[0] - profitTargetTicks * TickSize;
+				currentSlPrice = Close[0] + stopLossTicks * TickSize;
+				
+				//ExitShortLimit(currentSlPrice);
+				
+				Print("Enter short with price ->" + Close[0]);
+				Print("CurrentPtPrice ->" + currentPtPrice);
+				Print("CurrentSlPrice ->" + currentSlPrice);
+				BarTraded = CurrentBar;
+		
+			}
+			#endregion
+
+			//Print( Close[0] +" " + currentPtPrice + " " + trailingStopLossTicks * TickSize);
+			if (Position.MarketPosition == MarketPosition.Long) {
+				if (Close[0] > currentPtPrice)
+				{
+					currentPtPrice	= Close[0] + trailingStopLossTicks * TickSize;
+					Print("L CurrentPtPrice = "+ currentPtPrice);
+					//ExitLongLimit(1, true, 1, currentPtPrice, "profit target", "entry");
+					//ExitLongLimit(currentPtPrice);
+					
+					//currentSlPrice = Close[0] - trailingStopLossTicks * TickSize;
+					//SetStopLoss(CalculationMode.Price, currentSlPrice);
+					
+					newStopPrice = Close[0] - trailingStopLossTicks * TickSize;
+					ExitLongLimit(newStopPrice + 1);
+				}
+				if (Close[0] <= currentSlPrice)
+				{
+					ExitLong();
+				}
+			}
+			
+			if (Position.MarketPosition == MarketPosition.Short) {
+				if (Close[0] < currentPtPrice)
+				{
+					currentPtPrice= Close[0] - trailingStopLossTicks * TickSize;
+					Print("S CurrentPtPrice = "+ currentPtPrice);
+					//ExitLongLimit(1, true, 1, currentPtPrice, "profit target", "entry");
+					
+					newStopPrice = Close[0] + trailingStopLossTicks * TickSize;
+					ExitShortLimit(newStopPrice - 1);
+				}
+				if (Close[0] >= currentSlPrice)
+				{
+					ExitShort();
+				}
+			}
+
+		}
+
+		protected override void OnOrderUpdate(Cbi.Order order, double limitPrice, double stopPrice,
+			int quantity, int filled, double averageFillPrice,
+			Cbi.OrderState orderState, DateTime time, Cbi.ErrorCode error, string comment)
+		{
+			Print("The most current order state is: " + order.OrderState);   // OrderState.PartFilled
+			Print("stopPrice: " + stopPrice + " limitPrice: " + limitPrice); // OrderState.Working
+		}
+  
+		/*protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time) {
+			if (order.Name == "Stop loss" && order.OrderState == OrderState.Accepted) {
+				Print("ON ORDER UPDATE " + Time[0] + " new STOPLOSS: " + order.StopPrice);
+			}
+		}*/
+
+
+		#region Properties
+		[Range(1, int.MaxValue), NinjaScriptProperty]
+		[Display(ResourceType = typeof(Custom.Resource), Name = "Slow", GroupName = "NinjaScriptStrategyParameters", Order = 0)]
+		public int Slow
+		{ get; set; }
+
+		[Range(1, int.MaxValue), NinjaScriptProperty]
+		[Display(ResourceType = typeof(Custom.Resource), Name = "Medium", GroupName = "NinjaScriptStrategyParameters", Order = 1)]
+		public int Medium
+		{ get; set; }
+
+		[Range(1, int.MaxValue), NinjaScriptProperty]
+		[Display(ResourceType = typeof(Custom.Resource), Name = "Fast", GroupName = "NinjaScriptStrategyParameters", Order = 2)]
+		public int Fast
+		{ get; set; }
+
+		[Range(0.01, 1), NinjaScriptProperty]
+		[Display(ResourceType = typeof(Custom.Resource), Name = "Pinbar Confirmation Value", GroupName = "NinjaScriptStrategyParameters", Order = 3)]
+		public double pinbarConfirmationValue
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1, 1024)]
+		[Display(Name="Stop Loss Ticks", Description="Stop Loss Ticks", Order=10, GroupName="Parameters")]
+		public int stopLossTicks
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1, 1024)]
+		[Display(Name="profitTargetTicks", Description="profitTargetTicks", Order=11, GroupName="Parameters")]
+		public int profitTargetTicks
+		{ get; set; }
+
+		[NinjaScriptProperty]
+		[Range(1, 1024)]
+		[Display(Name="trailingStopLossTicks", Description="trailingStopLossTicks (offset)", Order=11, GroupName="Parameters")]
+		public int trailingStopLossTicks
+		{ get; set; }
+
+		#endregion
+		}
+}
