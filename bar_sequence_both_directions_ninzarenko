@@ -1,0 +1,128 @@
+#region Using declarations
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Xml.Serialization;
+using NinjaTrader.Cbi;
+using NinjaTrader.Gui;
+using NinjaTrader.Gui.Chart;
+using NinjaTrader.Gui.SuperDom;
+using NinjaTrader.Gui.Tools;
+using NinjaTrader.Data;
+using NinjaTrader.NinjaScript;
+using NinjaTrader.Core.FloatingPoint;
+using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.DrawingTools;
+#endregion
+
+//This namespace holds Strategies in this folder and is required. Do not change it. 
+namespace NinjaTrader.NinjaScript.Strategies
+{
+	public class BarSequenceBothDirectionsStatic : Strategy
+	{
+		private bool longTradeEnabled;
+		private bool shortTradeEnabled;
+		private double prevClose;
+		
+		protected override void OnStateChange()
+		{
+			if (State == State.SetDefaults)
+			{
+				Description									= @"Enter the description for your new custom Strategy here.";
+				Name										= "BarSequenceBothDirectionsStatic";
+				Calculate									= Calculate.OnBarClose;
+				EntriesPerDirection							= 1;
+				EntryHandling								= EntryHandling.AllEntries;
+				IsExitOnSessionCloseStrategy				= true;
+				ExitOnSessionCloseSeconds					= 30;
+				IsFillLimitOnTouch							= false;
+				MaximumBarsLookBack							= MaximumBarsLookBack.TwoHundredFiftySix;
+				OrderFillResolution							= OrderFillResolution.Standard;
+				Slippage									= 0;
+				StartBehavior								= StartBehavior.WaitUntilFlat;
+				TimeInForce									= TimeInForce.Gtc;
+				TraceOrders									= false;
+				RealtimeErrorHandling						= RealtimeErrorHandling.StopCancelClose;
+				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
+				BarsRequiredToTrade							= 2;
+				// Disable this property for performance gains in Strategy Analyzer optimizations
+				// See the Help Guide for additional information
+				IsInstantiatedOnEachOptimizationIteration	= true;
+				
+				barCount = 2;
+				profitTaker = 20;
+				stopLoss = 30;
+			}
+			else if (State == State.Configure)
+			{
+				//SetStopLoss(CalculationMode.Ticks, stopLoss);
+				//SetProfitTarget(CalculationMode.Ticks, profitTaker);
+			}
+		}
+
+		protected override void OnBarUpdate()
+		{
+			if (CurrentBars[0] < (BarsRequiredToTrade))
+				return;
+			
+			prevClose = Close[1];
+			
+			if (NBarsUp(barCount,false,true,true)[0] == 1) {
+				EnterLong();
+				
+				longTradeEnabled = true;
+			}
+			
+			if (NBarsDown(barCount,false,true,true)[0] == 1) {
+				EnterShort();
+				
+				shortTradeEnabled = true;
+			}
+			
+			if (Position.MarketPosition == MarketPosition.Long && longTradeEnabled == true)
+			{
+				ExitLongStopLimit(0, true, Position.Quantity, 0, prevClose - stopLoss * TickSize, "MyStop", "MyEntry");
+                ExitLongLimit(0, true, Position.Quantity, Position.AveragePrice + profitTaker * TickSize, "MyTarget", "MyEntry");
+
+				longTradeEnabled = false;
+			}
+			
+			if (Position.MarketPosition == MarketPosition.Short && shortTradeEnabled == true)
+			{
+				ExitShortStopLimit(0, true, Position.Quantity, 0, prevClose + stopLoss * TickSize, "MyStop", "MyEntry");
+                ExitShortLimit(0, true, Position.Quantity, Position.AveragePrice - profitTaker * TickSize, "MyTarget", "MyEntry");
+
+				shortTradeEnabled = false;
+			}
+		}
+		
+		#region Properties
+
+			[Range(1, int.MaxValue), NinjaScriptProperty]
+			[Display(Name="Bar Count", Description="", Order=1, GroupName="Parameters")]
+			public int barCount
+			{ get; set; }
+			
+			
+			[NinjaScriptProperty]
+			[Range(2, 1024)]
+			[Display(Name="Profit Taker", Description="Take Profit Ticks", Order=9, GroupName="Parameters")]
+			public int profitTaker
+			{ get; set; }			
+			
+			[NinjaScriptProperty]
+			[Range(1, 1024)]
+			[Display(Name="Stop Loss", Description="Stop Loss Ticks", Order=10, GroupName="Parameters")]
+			public int stopLoss
+			{ get; set; }			
+			
+		#endregion
+	}
+}
