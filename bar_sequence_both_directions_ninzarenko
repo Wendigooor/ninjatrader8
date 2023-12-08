@@ -37,14 +37,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 			{
 				Description									= @"Enter the description for your new custom Strategy here.";
 				Name										= "BarSequenceBothDirectionsStatic";
-				Calculate									= Calculate.OnBarClose;
+				Calculate									= Calculate.OnEachTick;
 				EntriesPerDirection							= 1;
 				EntryHandling								= EntryHandling.AllEntries;
 				IsExitOnSessionCloseStrategy				= true;
 				ExitOnSessionCloseSeconds					= 30;
 				IsFillLimitOnTouch							= false;
 				MaximumBarsLookBack							= MaximumBarsLookBack.TwoHundredFiftySix;
-				OrderFillResolution							= OrderFillResolution.Standard;
+				OrderFillResolution							= OrderFillResolution.High;
 				Slippage									= 0;
 				StartBehavior								= StartBehavior.WaitUntilFlat;
 				TimeInForce									= TimeInForce.Gtc;
@@ -57,11 +57,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 				IsInstantiatedOnEachOptimizationIteration	= true;
 				
 				barCount = 2;
-				profitTaker = 20;
-				stopLoss = 30;
+				profitTargetTicks = 20;
+				stopLossTicks = 30;
+				breakevenTicks = 10;
 			}
 			else if (State == State.Configure)
 			{
+				TraceOrders = true;
+				// you can't change them manually, so use Limit orders
 				//SetStopLoss(CalculationMode.Ticks, stopLoss);
 				//SetProfitTarget(CalculationMode.Ticks, profitTaker);
 			}
@@ -74,34 +77,59 @@ namespace NinjaTrader.NinjaScript.Strategies
 			
 			prevClose = Close[1];
 			
-			if (NBarsUp(barCount,false,true,true)[0] == 1) {
-				EnterLong();
+			if (NBarsUp(barCount,false,true,true)[0] == 1 && Position.MarketPosition != MarketPosition.Long) {
+				EnterLong("MyLongEntry");
 				
 				longTradeEnabled = true;
 			}
 			
-			if (NBarsDown(barCount,false,true,true)[0] == 1) {
-				EnterShort();
+			if (NBarsDown(barCount,false,true,true)[0] == 1 && Position.MarketPosition != MarketPosition.Short) {
+				EnterShort("MyShortEntry");
 				
 				shortTradeEnabled = true;
 			}
 			
+			// https://forum.ninjatrader.com/forum/ninjatrader-8/strategy-development/1145228-stop-orders-being-cancelled-at-close-of-the-bar	
+			// For anybody interested:
+			// - By default a simple stop orders get cancelled at the next bar close (something I did not know).
+			// - You have to create a more "advanced" order that has a setting called "IsLiveUntilCancelled" set to true. You can check it out here - https://ninjatrader.com/support/help...rlonglimit.htm
+			// - Then you have to do some order handling and cancel those orders if not executed (after a period of time, bars, or whatever method you want to use). You can check it out here - https://ninjatrader.com/support/help...r_handling.htm
+			
 			if (Position.MarketPosition == MarketPosition.Long && longTradeEnabled == true)
 			{
-				ExitLongStopLimit(0, true, Position.Quantity, 0, prevClose - stopLoss * TickSize, "MyStop", "MyEntry");
-                ExitLongLimit(0, true, Position.Quantity, Position.AveragePrice + profitTaker * TickSize, "MyTarget", "MyEntry");
+				// ExitLongStopMarket(int barsInProgressIndex, bool isLiveUntilCancelled, int quantity, double stopPrice, string signalName, string fromEntrySignal)
+				ExitLongStopMarket(0, true, Position.Quantity, Close[0] - stopLossTicks*TickSize, @"MyStopLong", @"MyLongEntry");
+				
+				// ExitLongLimit(int barsInProgressIndex, bool isLiveUntilCancelled, int quantity, double limitPrice, string signalName, string fromEntrySignal)
+				ExitLongLimit(0, true, Position.Quantity, (Close[0] + (profitTargetTicks * TickSize)) , @"MyTargetLong", @"MyLongEntry");
 
+				//ExitLongStopMarket(Position.Quantity, Close[0] - stopLossTicks*TickSize, @"MyStopLong", @"MyLongEntry");
+				//ExitLongLimit(Position.Quantity, (Close[0] + (profitTargetTicks * TickSize)) , @"MyTargetLong", @"MyLongEntry");
+				
 				longTradeEnabled = false;
 			}
 			
 			if (Position.MarketPosition == MarketPosition.Short && shortTradeEnabled == true)
 			{
-				ExitShortStopLimit(0, true, Position.Quantity, 0, prevClose + stopLoss * TickSize, "MyStop", "MyEntry");
-                ExitShortLimit(0, true, Position.Quantity, Position.AveragePrice - profitTaker * TickSize, "MyTarget", "MyEntry");
-
+				ExitShortStopMarket(0, true, Position.Quantity, Close[0] + stopLossTicks*TickSize, @"MyStopShort", @"MyShortEntry");
+				ExitShortLimit(0, true, Position.Quantity, (Close[0] - (profitTargetTicks * TickSize)) , @"MyTargetShort", @"MyShortEntry");
+				
+				//ExitShortStopMarket(Position.Quantity, Close[0] + stopLossTicks*TickSize, @"MyStopShort", @"MyShortEntry");
+				//ExitShortLimit(Position.Quantity, (Close[0] - (profitTargetTicks * TickSize)) , @"MyTargetShort", @"MyShortEntry");
+				
 				shortTradeEnabled = false;
 			}
 		}
+		
+		/*protected override void OnOrderUpdate(Cbi.Order order, double limitPrice, double stopPrice, 
+		    int quantity, int filled, double averageFillPrice, 
+		    Cbi.OrderState orderState, DateTime time, Cbi.ErrorCode error, string comment)
+		{
+		    //if (order.Name == "Stop loss" && order.OrderState == OrderState.Rejected){
+		    //    ExitLong();
+			//	ExitShort();
+			//}
+		}*/
 		
 		#region Properties
 
@@ -110,18 +138,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 			public int barCount
 			{ get; set; }
 			
-			
 			[NinjaScriptProperty]
 			[Range(2, 1024)]
 			[Display(Name="Profit Taker", Description="Take Profit Ticks", Order=9, GroupName="Parameters")]
-			public int profitTaker
+			public int profitTargetTicks
 			{ get; set; }			
 			
 			[NinjaScriptProperty]
 			[Range(1, 1024)]
 			[Display(Name="Stop Loss", Description="Stop Loss Ticks", Order=10, GroupName="Parameters")]
-			public int stopLoss
-			{ get; set; }			
+			public int stopLossTicks
+			{ get; set; }
+			
+			[NinjaScriptProperty]
+			[Range(1, 1024)]
+			[Display(Name="Breakeven", Description="Breakeven Ticks", Order=11, GroupName="Parameters")]
+			public int breakevenTicks
+			{ get; set; }
 			
 		#endregion
 	}
