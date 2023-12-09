@@ -27,7 +27,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 {
 	public class EMASMACrossiERRORSiHANDLING : Strategy
 	{
-		private bool FlipFlop;
+		private bool longTradeEnabled;
+		private bool shortTradeEnabled;
 
 		private EMA EMA1;
 		private SMA SMA1;
@@ -45,22 +46,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 				ExitOnSessionCloseSeconds					= 30;
 				IsFillLimitOnTouch							= false;
 				MaximumBarsLookBack							= MaximumBarsLookBack.TwoHundredFiftySix;
-				OrderFillResolution							= OrderFillResolution.Standard;
+				OrderFillResolution							= OrderFillResolution.High;
 				Slippage									= 0;
 				StartBehavior								= StartBehavior.WaitUntilFlat;
 				TimeInForce									= TimeInForce.Gtc;
 				TraceOrders									= false;
 				RealtimeErrorHandling						= RealtimeErrorHandling.StopCancelCloseIgnoreRejects;
 				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
-				BarsRequiredToTrade							= 20;
+				BarsRequiredToTrade							= 2;
 				// Disable this property for performance gains in Strategy Analyzer optimizations
 				// See the Help Guide for additional information
 				IsInstantiatedOnEachOptimizationIteration	= false;
-				Target					    = 26;
-				Stoploss					= 38;
+				
+				profitTargetTicks = 40;
+				stopLossTicks = 40;
+				
 				ShortEMA					= 5;
 				LongEMA					    = 21;
-				FlipFlop					= true;
 			}
 			else if (State == State.Configure)
 			{
@@ -86,63 +88,85 @@ namespace NinjaTrader.NinjaScript.Strategies
 				return;
 
 			 // Set 1
-			if (CrossAbove(EMA1, SMA1, 1))
+			if (CrossAbove(EMA1, SMA1, 1) && Position.MarketPosition != MarketPosition.Long)
 			{
-				SetProfitTarget(CalculationMode.Ticks, Target);
-				SetStopLoss(CalculationMode.Ticks, Stoploss);
-				
-				EnterLong(Convert.ToInt32(DefaultQuantity), @"Long");
-				FlipFlop = false;
+				EnterLong(Convert.ToInt32(DefaultQuantity), @"MyLongEntry");
+
+				longTradeEnabled = true;
 			}
 			
 			 // Set 2
-			if (CrossBelow(EMA1, SMA1, 1))
+			if (CrossBelow(EMA1, SMA1, 1) && Position.MarketPosition != MarketPosition.Short)
 			{
-				SetProfitTarget(CalculationMode.Ticks, Target);
-				SetStopLoss(CalculationMode.Ticks, Stoploss);
+				EnterShort(Convert.ToInt32(DefaultQuantity), @"MyShortEntry");
 				
-				EnterShort(Convert.ToInt32(DefaultQuantity), @"Short");
-				FlipFlop = true;
+				shortTradeEnabled = true;
+			}
+			
+			// https://forum.ninjatrader.com/forum/ninjatrader-8/strategy-development/1145228-stop-orders-being-cancelled-at-close-of-the-bar	
+			// For anybody interested:
+			// - By default a simple stop orders get cancelled at the next bar close (something I did not know).
+			// - You have to create a more "advanced" order that has a setting called "IsLiveUntilCancelled" set to true. You can check it out here - https://ninjatrader.com/support/help...rlonglimit.htm
+			// - Then you have to do some order handling and cancel those orders if not executed (after a period of time, bars, or whatever method you want to use). You can check it out here - https://ninjatrader.com/support/help...r_handling.htm
+			
+			if (Position.MarketPosition == MarketPosition.Long && longTradeEnabled == true)
+			{
+				ExitLongStopMarket(0, true, Position.Quantity, Close[0] - stopLossTicks*TickSize, @"MyStopLong", @"MyLongEntry");
+				ExitLongLimit(0, true, Position.Quantity, (Close[0] + (profitTargetTicks * TickSize)) , @"MyTargetLong", @"MyLongEntry");
+
+				longTradeEnabled = false;
+			}
+			
+			if (Position.MarketPosition == MarketPosition.Short && shortTradeEnabled == true)
+			{
+				ExitShortStopMarket(0, true, Position.Quantity, Close[0] + stopLossTicks*TickSize, @"MyStopShort", @"MyShortEntry");
+				ExitShortLimit(0, true, Position.Quantity, (Close[0] - (profitTargetTicks * TickSize)) , @"MyTargetShort", @"MyShortEntry");
+
+				shortTradeEnabled = false;
 			}
 			
 		}
 		
-		protected override void OnOrderUpdate(Cbi.Order order, double limitPrice, double stopPrice, 
+		/*protected override void OnOrderUpdate(Cbi.Order order, double limitPrice, double stopPrice, 
 		    int quantity, int filled, double averageFillPrice, 
 		    Cbi.OrderState orderState, DateTime time, Cbi.ErrorCode error, string comment)
 		{
 			//Print(order);
-
-		    if (order.Name == "Stop loss" && order.OrderState == OrderState.Rejected) {
+			
+			// for longs = orderAction=BuyToCover Sell
+			
+		    if (order.Name == "Stop loss" && order.OrderState == OrderState.Rejected){
 		        ExitLong();
-				    ExitShort();
-			  }
-		}
+				ExitShort();
+			}
+		}*/
 
 		#region Properties
-		[NinjaScriptProperty]
-		[Range(1, int.MaxValue)]
-		[Display(Name="Target", Order=1, GroupName="Parameters")]
-		public int Target
-		{ get; set; }
 
-		[NinjaScriptProperty]
-		[Range(1, int.MaxValue)]
-		[Display(Name="Stoploss", Order=2, GroupName="Parameters")]
-		public int Stoploss
-		{ get; set; }
+			[NinjaScriptProperty]
+			[Range(2, 1024)]
+			[Display(Name="Profit Taker", Description="Take Profit Ticks", Order=9, GroupName="Parameters")]
+			public int profitTargetTicks
+			{ get; set; }			
+			
+			[NinjaScriptProperty]
+			[Range(1, 1024)]
+			[Display(Name="Stop Loss", Description="Stop Loss Ticks", Order=10, GroupName="Parameters")]
+			public int stopLossTicks
+			{ get; set; }
 
-		[NinjaScriptProperty]
-		[Range(1, int.MaxValue)]
-		[Display(Name="ShortEMA", Order=3, GroupName="Parameters")]
-		public int ShortEMA
-		{ get; set; }
+			[NinjaScriptProperty]
+			[Range(1, int.MaxValue)]
+			[Display(Name="ShortEMA", Order=3, GroupName="Parameters")]
+			public int ShortEMA
+			{ get; set; }
 
-		[NinjaScriptProperty]
-		[Range(1, int.MaxValue)]
-		[Display(Name="LongEMA", Order=4, GroupName="Parameters")]
-		public int LongEMA
-		{ get; set; }
+			[NinjaScriptProperty]
+			[Range(1, int.MaxValue)]
+			[Display(Name="LongEMA", Order=4, GroupName="Parameters")]
+			public int LongEMA
+			{ get; set; }
+
 		#endregion
 
 	}
