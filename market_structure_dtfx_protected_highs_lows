@@ -1,0 +1,433 @@
+using NinjaTrader.Cbi;
+using NinjaTrader.Data;
+using NinjaTrader.Indicator;
+using NinjaTrader.Gui.Chart;
+using NinjaTrader.NinjaScript;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+
+namespace NinjaTrader.NinjaScript.Indicators
+{
+    [Browsable(false)]
+    [CompileInRelease(false)]
+    public class MarketStructureDTFX : Indicator
+    {
+        private List<double> arrayMarkGannML = new List<double> { 0, 0, 0 };
+        private List<double> arrayMarkChoChGannML = new List<double> { 0, 0, 0, 0, 0, 0 };
+        private List<int> arrayXF0GannML = new List<int>();
+        private List<double> arrayYF0GannML = new List<double>();
+        private List<int> arrayXF1GannML = new List<int>();
+        private List<double> arrayYF1GannML = new List<double>();
+        private List<Line> arrayLineF1GannML = new List<Line>();
+        private List<int> arraySXF1GannML = new List<int>();
+        private List<double> arraySYF1GannML = new List<double>();
+        private List<Line> arraySLineF1GannML = new List<Line>();
+
+        private bool showF1GannML = false;
+        private bool showSF1GannML = true;
+        private Color colorF1GannML = Color.Black;
+        private bool showChoChF1GannML = false;
+        private bool showChoChSF1GannML = true;
+
+        private int dottedLineWidth;
+        private int solidLineWidth;
+        private int dashedLineWidth;
+
+        // Set the line widths in the State.SetDefaults block
+        // dottedLineWidth = 1;
+        // solidLineWidth = 2;
+        // dashedLineWidth = 3;
+
+        private List<float> arrayMarkGannML = new List<float> { 0f, 0f, 0f };
+        private List<float> arrayMarkChoChGannML = new List<float> { 0f, 0f, 0f, 0f, 0f, 0f };
+        private List<int> arrayXF0GannML = new List<int>();
+        private List<float> arrayYF0GannML = new List<float>();
+        private List<int> arrayXF1GannML = new List<int>();
+        private List<float> arrayYF1GannML = new List<float>();
+        private List<Line> arrayLineF1GannML = new List<Line>();
+        private List<int> arraySXF1GannML = new List<int>();
+        private List<float> arraySYF1GannML = new List<float>();
+        private List<Line> arraySLineF1GannML = new List<Line>();
+
+        private List<Line> arrayLineMiddlePoint = new List<Line>();
+
+        // Initialize the arrays with the desired starting values in the State.SetDefaults block
+        // For example:
+        // arrayXF0GannML.Add(Time[0]);
+        // arrayYF0GannML.Add(Close[0]);
+
+        private float highPrev;
+        private float lowPrev;
+
+
+        // Other variables and properties...
+
+
+
+
+        protected override void OnStateChange()
+        {
+            if (State == State.SetDefaults)
+            {
+                Description = @"Market Structure | DTFX [@wendigooor]";
+                Name = "MarketStructureDTFX";
+                Calculate = Calculate.OnBarClose;
+                // Add your indicator parameters here...
+            }
+            else if (State == State.Configure)
+            {
+                // Configure your indicator parameters here...
+            }
+        }
+
+        private void f_CalculateAndDrawFn1(int pointX, double pointY)
+        {
+            //F0 : Song cua nen
+            arrayXF0GannML.Insert(0, pointX);
+            arrayYF0GannML.Insert(0, pointY);
+            //F1,F2,...: Song cua song theo Gann
+            if (showF1GannML || showF2GannML || showF3GannML || showSF1GannML || showSF2GannML || showSF3GannML)
+            {
+                // Your function logic here...
+            }
+        }
+
+        private int f_CalculateF0(double _pointX, double _pointY, List<double> arrayX0, List<double> arrayY0)
+        {
+            arrayX0.Insert(0, _pointX);
+            arrayY0.Insert(0, _pointY);
+            return 1;
+        }
+
+        private int f_CalculateFn1(double _pointX, double _pointY, List<double> arrayXn, List<double> arrayYn, List<double> arrayXFn1, List<double> arrayYFn1)
+        {
+            int _resultdraw = 0;
+
+            if ((arrayYFn1[0] >= arrayYFn1[1] && arrayYn[0] < arrayYFn1[1]) || (arrayYFn1[0] <= arrayYFn1[1] && arrayYn[0] > arrayYFn1[1]))
+            {
+                arrayXFn1.Insert(0, _pointX);
+                arrayYFn1.Insert(0, _pointY);
+                _resultdraw = 1;
+            }
+            else if (arrayYFn1[0] >= arrayYFn1[1] && (arrayYn[0] < arrayYn[1] && arrayYn[0] < arrayYn[2] && arrayYn[1] < arrayYn[3]) && arrayYn[2] < arrayYn[3])
+            {
+                arrayXFn1.Insert(0, _pointX);
+                arrayYFn1.Insert(0, _pointY);
+                _resultdraw = 1;
+            }
+            else if (arrayYFn1[0] <= arrayYFn1[1] && (arrayYn[0] > arrayYn[1] && arrayYn[0] > arrayYn[2] && arrayYn[1] > arrayYn[3]) && arrayYn[2] > arrayYn[3])
+            {
+                arrayXFn1.Insert(0, _pointX);
+                arrayYFn1.Insert(0, _pointY);
+                _resultdraw = 1;
+            }
+            else if (arrayYFn1[0] >= arrayYFn1[1] && _pointY >= arrayYFn1[0] && (_pointY >= arrayYFn1[0] || (arrayYn[0] > arrayYn[2] && arrayYn[2] > arrayYn[1]) || (arrayYn[0] > arrayYn[1] && arrayYn[1] > arrayYn[2] && arrayYn[2] > arrayYn[3])))
+            {
+                arrayXFn1[0] = _pointX;
+                arrayYFn1[0] = _pointY;
+                _resultdraw = 2;
+            }
+            else if (arrayYFn1[0] <= arrayYFn1[1] && _pointY <= arrayYFn1[0] && (_pointY <= arrayYFn1[0] || (arrayYn[0] < arrayYn[2] && arrayYn[2] < arrayYn[1]) || (arrayYn[0] < arrayYn[1] && arrayYn[1] < arrayYn[2] && arrayYn[2] < arrayYn[3])))
+            {
+                arrayXFn1[0] = _pointX;
+                arrayYFn1[0] = _pointY;
+                _resultdraw = 2;
+            }
+
+            return _resultdraw;
+        }
+
+        public int f_CalculateSFn1(int _pointX, int _pointY, List<int> _arrayMark, int _mIdxMark, List<int> arraySXFn1, List<int> arraySYFn1)
+        {
+            int _resultdraw = 0;
+
+            if (_arrayMark[_mIdxMark] == 0)
+            {
+                if ((arraySYFn1[0] >= arraySYFn1[1] && _pointY >= arraySYFn1[0]) || (arraySYFn1[0] <= arraySYFn1[1] && _pointY <= arraySYFn1[0]))
+                {
+                    arraySXFn1[0] = _pointX;
+                    arraySYFn1[0] = _pointY;
+                    _resultdraw = 2;
+                }
+                else if ((arraySYFn1[0] >= arraySYFn1[1] && _pointY < arraySYFn1[1]) || (arraySYFn1[0] <= arraySYFn1[1] && _pointY > arraySYFn1[1]))
+                {
+                    arraySXFn1.Insert(0, _pointX);
+                    arraySYFn1.Insert(0, _pointY);
+                    _resultdraw = 1;
+                }
+                else if ((arraySYFn1[0] >= arraySYFn1[1] && _pointY < arraySYFn1[0] && _pointY > arraySYFn1[1]) || (arraySYFn1[0] <= arraySYFn1[1] && _pointY > arraySYFn1[0] && _pointY < arraySYFn1[1]))
+                {
+                    arraySXFn1.Insert(0, _pointX);
+                    arraySYFn1.Insert(0, _pointY);
+                    _arrayMark[_mIdxMark] = _pointY;
+                    _resultdraw = 1;
+                }
+            }
+            else if (_arrayMark[_mIdxMark] > 0)
+            {
+                if ((arraySYFn1[0] >= arraySYFn1[1] && _pointY < arraySYFn1[1]) || (arraySYFn1[0] <= arraySYFn1[1] && _pointY > arraySYFn1[1]))
+                {
+                    arraySXFn1.Insert(0, _pointX);
+                    arraySYFn1.Insert(0, _pointY);
+                    _arrayMark[_mIdxMark] = 0;
+                    _resultdraw = 1;
+                }
+                else if ((arraySYFn1[0] >= arraySYFn1[1] && _pointY > arraySYFn1[2]) || (arraySYFn1[0] <= arraySYFn1[1] && _pointY < arraySYFn1[2]))
+                {
+                    arraySXFn1[0] = _pointX;
+                    arraySYFn1[0] = _pointY;
+                    _arrayMark[_mIdxMark] = 0;
+                    _resultdraw = 2;
+                }
+                else if ((arraySYFn1[0] >= arraySYFn1[1] && _pointY <= arraySYFn1[2] && _pointY >= arraySYFn1[0]) || (arraySYFn1[0] <= arraySYFn1[1] && _pointY >= arraySYFn1[2] && _pointY <= arraySYFn1[0]))
+                {
+                    arraySXFn1[0] = _pointX;
+                    arraySYFn1[0] = _pointY;
+                    _arrayMark[_mIdxMark] = _pointY;
+                    _resultdraw = 2;
+                }
+            }
+
+            return _resultdraw;
+        }
+
+        public void f_CalculateRemoveDuplicateLine(List<Line> arrayLine, List<Line> arraySLine)
+        {
+            if (arraySLine.Count > 1 && arrayLine.Count > 1)
+            {
+                Line sLine = arraySLine[1];
+                Line line = arrayLine[1];
+
+                if (sLine.GetY1() == line.GetY1() && sLine.GetY2() == line.GetY2() && sLine.GetX1() == line.GetX1() && sLine.GetX2() == line.GetX2())
+                {
+                    line.Dispose();
+                    arrayLine.RemoveAt(1);
+                }
+            }
+        }
+
+        public Tuple<int, float> f_CalculateChoCh(List<int> arraySXFn1, List<float> arraySYFn1)
+        {
+            int _X = 0;
+            float _Y = 0;
+
+            if ((arraySYFn1[3] > arraySYFn1[2] && arraySYFn1[3] < arraySYFn1[1] && arraySYFn1[0] < arraySYFn1[2]) || (arraySYFn1[3] < arraySYFn1[2] && arraySYFn1[3] > arraySYFn1[1] && arraySYFn1[0] > arraySYFn1[2]))
+            {
+                _X = arraySXFn1[2];
+                _Y = arraySYFn1[2];
+            }
+
+            return Tuple.Create(_X, _Y);
+        }
+
+        public void f_CalculateDrawF(int _drawF, bool _showSF, List<Line> arrayLine, List<int> arrayX, List<float> arrayY, bool showChoCh, List<float> arrayMChoCh, int idxChoCh, Color _color)
+        {
+            if (_drawF > 0)
+            {
+                if (_drawF == 1)
+                {
+                    Line line = new Line(arrayX[1], arrayY[1], arrayX[0], arrayY[0]);
+                    line.Color = _color;
+                    line.XLocation = XLocation.BarTime;
+                    line.Width = dottedLineWidth;
+                    line.Style = LineStyle.Dotted;
+                    arrayLine.Insert(0, line);
+                }
+                else if (_drawF == 2 && arrayLine.Count > 0)
+                {
+                    Line line = arrayLine[0];
+                    line.SetXY2(arrayX[0], arrayY[0]);
+
+                    Tuple<int, float> choCh = f_CalculateChoCh(arrayX, arrayY);
+
+                    if (showChoCh && choCh.Item2 > 0 && arrayMChoCh[idxChoCh] != choCh.Item2)
+                    {
+                        arrayMChoCh[idxChoCh] = choCh.Item2;
+
+                        Line lineChoCh = new Line(choCh.Item1, choCh.Item2, (int)Time[0], choCh.Item2);
+                        lineChoCh.Color = _color;
+                        lineChoCh.XLocation = XLocation.BarTime;
+                        lineChoCh.Width = dottedLineWidth;
+                        lineChoCh.Style = LineStyle.Dotted;
+                    }
+                }
+            }
+        }
+
+        public void f_CalculateDrawSF(int _drawSF, List<Line> arrayLine, List<Line> arraySLine, List<int> arraySX, List<float> arraySY, bool showChoCh, List<float> arrayMChoCh, int idxChoCh, Color _color)
+        {
+            if (_drawSF > 0)
+            {
+                if (_drawSF == 1)
+                {
+                    Line line = new Line(arraySX[1], arraySY[1], arraySX[0], arraySY[0]);
+                    line.Color = _color;
+                    line.XLocation = XLocation.BarTime;
+                    line.Width = solidLineWidth;
+                    arraySLine.Insert(0, line);
+                }
+                else if (_drawSF == 2 && arraySLine.Count > 0)
+                {
+                    Line line = arraySLine[0];
+                    line.SetXY2(arraySX[0], arraySY[0]);
+
+                    f_CalculateRemoveDuplicateLine(arrayLine, arraySLine);
+
+                    Tuple<int, float> choCh = f_CalculateChoCh(arraySX, arraySY);
+
+                    if (showChoCh && choCh.Item2 > 0 && arrayMChoCh[idxChoCh] != choCh.Item2)
+                    {
+                        arrayMChoCh[idxChoCh] = choCh.Item2;
+
+                        Line lineChoCh = new Line(choCh.Item1, choCh.Item2, (int)Time[0], choCh.Item2);
+                        lineChoCh.Color = _color;
+                        lineChoCh.XLocation = XLocation.BarTime;
+                        lineChoCh.Width = dashedLineWidth;
+                        lineChoCh.Style = LineStyle.Dashed;
+                    }
+                }
+            }
+        }
+
+        public void f_CalculateAndDrawFn1(int _pointX, float _pointY)
+        {
+            // F0: Song cua nen
+            arrayXF0GannML.Insert(0, _pointX);
+            arrayYF0GannML.Insert(0, _pointY);
+
+            // F1, F2, ...: Song cua song theo Gann
+            if (showF1GannML || showF2GannML || showF3GannML || showSF1GannML || showSF2GannML || showSF3GannML)
+            {
+                int drawF1 = f_CalculateFn1(_pointX, _pointY, arrayXF0GannML, arrayYF0GannML, arrayXF1GannML, arrayYF1GannML);
+                f_CalculateDrawF(showF1GannML ? drawF1 : 0, showSF1GannML, arrayLineF1GannML, arrayXF1GannML, arrayYF1GannML, showChoChF1GannML, arrayMarkChoChGannML, 0, colorF1GannML);
+
+                if (drawF1 > 0 && (showF2GannML || showF3GannML || showSF1GannML || showSF2GannML || showSF3GannML))
+                {
+                    int drawSF1 = f_CalculateSFn1(_pointX, _pointY, arrayMarkGannML, 0, arraySXF1GannML, arraySYF1GannML);
+                    f_CalculateDrawSF(showSF1GannML ? drawSF1 : 0, arrayLineF1GannML, arraySLineF1GannML, arraySXF1GannML, arraySYF1GannML, showChoChSF1GannML, arrayMarkChoChGannML, 1, colorF1GannML);
+                }
+            }
+        }
+
+        public void f_CalculateAndDraw(int _pointX, float _pointY1, float _pointY2)
+        {
+            if ((arrayYF0GannML[0] > _pointY1 && arrayYF0GannML[0] > _pointY2) || (arrayYF0GannML[0] < _pointY1 && arrayYF0GannML[0] < _pointY2))
+            {
+                f_CalculateAndDrawFn1(Time[0], arrayYF0GannML[1]);
+            }
+
+            f_CalculateAndDrawFn1(Time[0], _pointY1);
+            f_CalculateAndDrawFn1(Time[0], _pointY2);
+        }
+
+        private void DrawBox(int left, float top, int right, float bottom, Color bgColor, Color borderColor)
+        {
+            // Implement the drawing of a box using NinjaTrader's drawing tools
+        }
+
+
+        protected override void OnBarUpdate()
+        {
+            if (CurrentBar < 1) return;
+
+            highPrev = High[0];
+            lowPrev = Low[0];
+
+            if ((pullbackWithCloseBar ? Close[0] : High[0]) > highPrev[1] && Low[0] > lowPrev[1])
+            {
+                f_CalculateAndDraw(Time[0], customLow, customHigh);
+            }
+            else if (High[0] < highPrev[1] && (pullbackWithCloseBar ? Close[0] : Low[0]) < lowPrev[1])
+            {
+                f_CalculateAndDraw(Time[0], customHigh, customLow);
+            }
+            else if ((Close[0] >= highPrev[1] && Low[0] < lowPrev[1]) || (High[0] > highPrev[1] && Close[0] <= lowPrev[1]))
+            {
+                if (Close[0] > Open[0])
+                {
+                    f_CalculateAndDraw(Time[0], customLow, customHigh);
+                }
+                else
+                {
+                    f_CalculateAndDraw(Time[0], customHigh, customLow);
+                }
+            }
+
+            if ((High[0] - minErrorMeasurementPointsHighsLows) <= highPrev[1] && (Low[0] + minErrorMeasurementPointsHighsLows) >= lowPrev[1])
+            {
+                highPrev = highPrev[1];
+                lowPrev = lowPrev[1];
+            }
+
+
+            int confirmed_line_to = arraySXF1GannML[0];
+            int confirmed_line_from = arraySXF1GannML[2];
+            float confirmed_value0 = arraySYF1GannML[0];
+            float confirmed_value1 = arraySYF1GannML[1];
+            float confirmed_value2 = arraySYF1GannML[2];
+            float confirmed_value3 = arraySYF1GannML[3];
+            float confirmed_value4 = arraySYF1GannML[4];
+
+            float mid_level = (confirmed_value1 + confirmed_value2) / 2;
+
+            bool bull_market = (customHigh[1] > confirmed_value1) && (customHigh[1] > confirmed_value2);
+            bool bear_market = (customLow[1] < confirmed_value1) && (customLow[1] < confirmed_value2);
+
+            float bullBosFlipConfirmationCandleValue = (useWicksForFlip ? High[0] : Close[0]) - (useMeasurementPointsErrorsForBosDrawings ? minErrorMeasurementPoints : 0);
+            float bearBosFlipConfirmationCandleValue = (useWicksForFlip ? Low[0] : Close[0]) + (useMeasurementPointsErrorsForBosDrawings ? minErrorMeasurementPoints : 0);
+
+            bool bullBOS = confirmed_value0 > confirmed_value2 && confirmed_value0 > confirmed_value1 && (bullBosFlipConfirmationCandleValue > confirmed_value2) && BarState == BarState.Confirmed;
+            bool bearBOS = confirmed_value0 < confirmed_value2 && confirmed_value0 < confirmed_value1 && (bearBosFlipConfirmationCandleValue < confirmed_value2) && BarState == BarState.Confirmed;
+
+            Color market_direction_color = bull_market ? bullColor : bearColor;
+
+            int prevBullishBOSbar = BarsSince(bullBOS);
+            int prevBearishBOSbar = BarsSince(bearBOS);
+
+            bool bull_market_state = prevBearishBOSbar > prevBullishBOSbar;
+            Color market_state_color = bull_market_state ? bullColor : bearColor;
+
+            // Drawings
+            if (drawMiddleLine && (bullBOS || bearBOS))
+            {
+                int arraySize = arrayLineMiddlePoint.Count;
+                Line lastLineElement = arraySize > 0 ? arrayLineMiddlePoint[arraySize - 1] : null;
+
+                if (lastLineElement == null || lastLineElement.GetX1() != confirmed_line_from)
+                {
+                    Line newLine = new Line(confirmed_line_from, mid_level, confirmed_line_to + middlelineLength * 1000 * Timeframe.ToSeconds(Timeframe.Period), mid_level);
+                    newLine.Color = market_state_color;
+                    newLine.Width = solidLineWidth;
+                    newLine.XLocation = XLocation.BarTime;
+                    arrayLineMiddlePoint.Add(newLine);
+                }
+            }
+
+            if (drawRectangles && (bullBOS || bearBOS))
+            {
+                int left = arraySXF1GannML[2];
+
+                if (left != left[1]) // do not draw the same rectangle x times
+                {
+                    int right = arraySXF1GannML[1];
+                    float top = bull_market ? confirmed_value2 : confirmed_value1;
+                    float bottom = bull_market ? confirmed_value1 : confirmed_value2;
+                    Color boxBgColor = Color.FromArgb(rectangleOpacity, market_state_color.ToArgb());
+
+                    DrawBox(left, top, right, bottom, boxBgColor, boxBgColor);
+                }
+            }
+
+            if (drawMarketDirection)
+            {
+                PlotShape(market_state_color, Shape.Square, Location.Top, Size.Small, "");
+            }
+
+
+        }
+
+        // Other functions...
+    }
+}
