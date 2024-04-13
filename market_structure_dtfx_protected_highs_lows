@@ -1,29 +1,48 @@
-using NinjaTrader.Cbi;
-using NinjaTrader.Data;
-using NinjaTrader.Indicator;
-using NinjaTrader.Gui.Chart;
-using NinjaTrader.NinjaScript;
+#region Using declarations
 using System;
 using System.Collections.Generic;
-using System.Drawing;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Xml.Serialization;
+using NinjaTrader.Cbi;
+using NinjaTrader.Gui;
+using NinjaTrader.Gui.Chart;
+using NinjaTrader.Gui.SuperDom;
+using NinjaTrader.Gui.Tools;
+using NinjaTrader.Data;
+using NinjaTrader.NinjaScript;
+using NinjaTrader.Core.FloatingPoint;
+using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.DrawingTools;
+using Drawing = NinjaTrader.NinjaScript.DrawingTools;
+#endregion
 
-namespace NinjaTrader.NinjaScript.Indicators
+//This namespace holds Strategies in this folder and is required. Do not change it. 
+namespace NinjaTrader.NinjaScript.Strategies.dtfx
 {
-    [Browsable(false)]
-    [CompileInRelease(false)]
-    public class MarketStructureDTFX : Indicator
-    {
-        private List<double> arrayMarkGannML = new List<double> { 0, 0, 0 };
+	public class dtfx : Strategy
+	{
+		
+		
+		private List<double> arrayMarkGannML = new List<double> { 0, 0, 0 };
         private List<double> arrayMarkChoChGannML = new List<double> { 0, 0, 0, 0, 0, 0 };
-        private List<int> arrayXF0GannML = new List<int>();
+        private List<double> arrayXF0GannML = new List<double>();
         private List<double> arrayYF0GannML = new List<double>();
-        private List<int> arrayXF1GannML = new List<int>();
+        private List<double> arrayXF1GannML = new List<double>();
         private List<double> arrayYF1GannML = new List<double>();
-        private List<Line> arrayLineF1GannML = new List<Line>();
-        private List<int> arraySXF1GannML = new List<int>();
+        private List<Drawing.Line> arrayLineF1GannML = new List<Drawing.Line>();
+		//private Drawing.Line[] arrayLineF1GannML = new Drawing.Line[500];
+        private List<double> arraySXF1GannML = new List<double>();
         private List<double> arraySYF1GannML = new List<double>();
-        private List<Line> arraySLineF1GannML = new List<Line>();
+        private List<Drawing.Line> arraySLineF1GannML = new List<Drawing.Line>();
+		
+		private List<Drawing.Line> arrayLineMiddlePoint = new List<Drawing.Line>();
 
         private bool showF1GannML = false;
         private bool showSF1GannML = true;
@@ -31,79 +50,87 @@ namespace NinjaTrader.NinjaScript.Indicators
         private bool showChoChF1GannML = false;
         private bool showChoChSF1GannML = true;
 
-        private int dottedLineWidth;
-        private int solidLineWidth;
-        private int dashedLineWidth;
-
-        // Set the line widths in the State.SetDefaults block
-        // dottedLineWidth = 1;
-        // solidLineWidth = 2;
-        // dashedLineWidth = 3;
-
-        private List<float> arrayMarkGannML = new List<float> { 0f, 0f, 0f };
-        private List<float> arrayMarkChoChGannML = new List<float> { 0f, 0f, 0f, 0f, 0f, 0f };
-        private List<int> arrayXF0GannML = new List<int>();
-        private List<float> arrayYF0GannML = new List<float>();
-        private List<int> arrayXF1GannML = new List<int>();
-        private List<float> arrayYF1GannML = new List<float>();
-        private List<Line> arrayLineF1GannML = new List<Line>();
-        private List<int> arraySXF1GannML = new List<int>();
-        private List<float> arraySYF1GannML = new List<float>();
-        private List<Line> arraySLineF1GannML = new List<Line>();
-
-        private List<Line> arrayLineMiddlePoint = new List<Line>();
-
-        // Initialize the arrays with the desired starting values in the State.SetDefaults block
-        // For example:
-        // arrayXF0GannML.Add(Time[0]);
-        // arrayYF0GannML.Add(Close[0]);
+        private int dottedLineWidth = 1;
+        private int solidLineWidth = 2;
+        private int dashedLineWidth = 3;
 
         private float highPrev;
         private float lowPrev;
-
-
+		
         // Other variables and properties...
+		
+		
+		protected override void OnStateChange()
+		{
+			if (State == State.SetDefaults)
+			{
+				Description									= @"Enter the description for your new custom Strategy here.";
+				Name										= "dtfx";
+				Calculate									= Calculate.OnBarClose;
+				EntriesPerDirection							= 1;
+				EntryHandling								= EntryHandling.AllEntries;
+				IsExitOnSessionCloseStrategy				= true;
+				ExitOnSessionCloseSeconds					= 30;
+				IsFillLimitOnTouch							= false;
+				MaximumBarsLookBack							= MaximumBarsLookBack.TwoHundredFiftySix;
+				OrderFillResolution							= OrderFillResolution.Standard;
+				Slippage									= 0;
+				StartBehavior								= StartBehavior.WaitUntilFlat;
+				TimeInForce									= TimeInForce.Gtc;
+				TraceOrders									= false;
+				RealtimeErrorHandling						= RealtimeErrorHandling.StopCancelClose;
+				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
+				BarsRequiredToTrade							= 20;
+				// Disable this property for performance gains in Strategy Analyzer optimizations
+				// See the Help Guide for additional information
+				IsInstantiatedOnEachOptimizationIteration	= true;
+			}
+			else if (State == State.Configure)
+			{
+			}
+		}
+		
+		private void f_CalculateAndDrawFn1(double _pointX, double _pointY)
+		{
+		    //F0 : Song cua nen
+		    arrayXF0GannML.Insert(0, _pointX);
+		    arrayYF0GannML.Insert(0, _pointY);
 
+		    //F1,F2,...: Song cua song theo Gann
+		    if (showF1GannML || showSF1GannML)
+		    {
+		        int drawF1 = f_CalculateFn1(_pointX, _pointY, arrayXF0GannML, arrayYF0GannML, arrayXF1GannML, arrayYF1GannML);
+		        f_CalculateDrawF(showF1GannML ? drawF1 : 0, showChoChF1GannML, arrayLineF1GannML, arrayXF1GannML, arrayYF1GannML, showChoChF1GannML, arrayMarkChoChGannML, 0, colorF1GannML);
+		       // f_CalculateDrawF(showF1GannML?drawF1:0,showSF1GannML,arrayLineF1GannML,arrayXF1GannML,arrayYF1GannML,showChoChF1GannML,arrayMarkChoChGannML,0,colorF1GannML)
 
+				if (drawF1 > 0 && (showSF1GannML))
+		        {
+		            int drawSF1 = f_CalculateSFn1(_pointX, _pointY, arrayMarkChoChGannML, 0, arraySXF1GannML, arraySYF1GannML);
+		            f_CalculateDrawSF(showSF1GannML ? drawSF1 : 0, arrayLineF1GannML, arraySLineF1GannML, arraySXF1GannML, arraySYF1GannML, arrayMarkChoChGannML, 1, colorF1GannML);
+		        }
+		    }
+		}
 
+		private void f_CalculateAndDraw(double _pointX, double _pointY1, double _pointY2)
+		{
+		    if ((arrayYF0GannML[0] > _pointY1 && arrayYF0GannML[0] > _pointY2) || (arrayYF0GannML[0] < _pointY1 && arrayYF0GannML[0] < _pointY2))
+		    {
+		        f_CalculateAndDrawFn1(Time[0], arrayYF0GannML[1]);
+		    }
+		    f_CalculateAndDrawFn1(Time[0], _pointY1);
+		    f_CalculateAndDrawFn1(Time[0], _pointY2);
+		}
 
-        protected override void OnStateChange()
-        {
-            if (State == State.SetDefaults)
-            {
-                Description = @"Market Structure | DTFX [@wendigooor]";
-                Name = "MarketStructureDTFX";
-                Calculate = Calculate.OnBarClose;
-                // Add your indicator parameters here...
-            }
-            else if (State == State.Configure)
-            {
-                // Configure your indicator parameters here...
-            }
-        }
-
-        private void f_CalculateAndDrawFn1(int pointX, double pointY)
-        {
-            //F0 : Song cua nen
-            arrayXF0GannML.Insert(0, pointX);
-            arrayYF0GannML.Insert(0, pointY);
-            //F1,F2,...: Song cua song theo Gann
-            if (showF1GannML || showF2GannML || showF3GannML || showSF1GannML || showSF2GannML || showSF3GannML)
-            {
-                // Your function logic here...
-            }
-        }
-
-        private int f_CalculateF0(double _pointX, double _pointY, List<double> arrayX0, List<double> arrayY0)
+        private double f_CalculateF0(double _pointX, double _pointY, List<double> arrayX0, List<double> arrayY0)
         {
             arrayX0.Insert(0, _pointX);
             arrayY0.Insert(0, _pointY);
             return 1;
         }
 
-        private int f_CalculateFn1(double _pointX, double _pointY, List<double> arrayXn, List<double> arrayYn, List<double> arrayXFn1, List<double> arrayYFn1)
+        private double f_CalculateFn1(double _pointX, double _pointY, List<double> arrayXn, List<double> arrayYn, List<double> arrayXFn1, List<double> arrayYFn1)
         {
-            int _resultdraw = 0;
+            double _resultdraw = 0;
 
             if ((arrayYFn1[0] >= arrayYFn1[1] && arrayYn[0] < arrayYFn1[1]) || (arrayYFn1[0] <= arrayYFn1[1] && arrayYn[0] > arrayYFn1[1]))
             {
@@ -139,9 +166,9 @@ namespace NinjaTrader.NinjaScript.Indicators
             return _resultdraw;
         }
 
-        public int f_CalculateSFn1(int _pointX, int _pointY, List<int> _arrayMark, int _mIdxMark, List<int> arraySXFn1, List<int> arraySYFn1)
+        public double f_CalculateSFn1(double _pointX, double _pointY, List<double> _arrayMark, double _mIdxMark, List<double> arraySXFn1, List<double> arraySYFn1)
         {
-            int _resultdraw = 0;
+            double _resultdraw = 0;
 
             if (_arrayMark[_mIdxMark] == 0)
             {
@@ -193,7 +220,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             return _resultdraw;
         }
 
-        public void f_CalculateRemoveDuplicateLine(List<Line> arrayLine, List<Line> arraySLine)
+        public void f_CalculateRemoveDuplicateLine(List<Drawing.Line> arrayLine, List<Drawing.Line> arraySLine)
         {
             if (arraySLine.Count > 1 && arrayLine.Count > 1)
             {
@@ -207,8 +234,9 @@ namespace NinjaTrader.NinjaScript.Indicators
                 }
             }
         }
-
-        public Tuple<int, float> f_CalculateChoCh(List<int> arraySXFn1, List<float> arraySYFn1)
+		
+		
+        public Tuple<double, float> f_CalculateChoCh(List<double> arraySXFn1, List<float> arraySYFn1)
         {
             int _X = 0;
             float _Y = 0;
@@ -222,7 +250,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             return Tuple.Create(_X, _Y);
         }
 
-        public void f_CalculateDrawF(int _drawF, bool _showSF, List<Line> arrayLine, List<int> arrayX, List<float> arrayY, bool showChoCh, List<float> arrayMChoCh, int idxChoCh, Color _color)
+        public void f_CalculateDrawF(double _drawF, bool _showSF, List<Drawing.Line> arrayLine, List<int> arrayX, List<float> arrayY, bool showChoCh, List<float> arrayMChoCh, int idxChoCh, Color _color)
         {
             if (_drawF > 0)
             {
@@ -256,7 +284,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
         }
 
-        public void f_CalculateDrawSF(int _drawSF, List<Line> arrayLine, List<Line> arraySLine, List<int> arraySX, List<float> arraySY, bool showChoCh, List<float> arrayMChoCh, int idxChoCh, Color _color)
+        public void f_CalculateDrawSF(int _drawSF, List<Drawing.Line> arrayLine, List<Drawing.Line> arraySLine, List<double> arraySX, List<float> arraySY, bool showChoCh, List<float> arrayMChoCh, int idxChoCh, Color _color)
         {
             if (_drawSF > 0)
             {
@@ -291,13 +319,12 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
         }
 
-        public void f_CalculateAndDrawFn1(int _pointX, float _pointY)
+		/*
+        public void f_CalculateAndDrawFn1(double _pointX, double _pointY)
         {
-            // F0: Song cua nen
             arrayXF0GannML.Insert(0, _pointX);
             arrayYF0GannML.Insert(0, _pointY);
 
-            // F1, F2, ...: Song cua song theo Gann
             if (showF1GannML || showF2GannML || showF3GannML || showSF1GannML || showSF2GannML || showSF3GannML)
             {
                 int drawF1 = f_CalculateFn1(_pointX, _pointY, arrayXF0GannML, arrayYF0GannML, arrayXF1GannML, arrayYF1GannML);
@@ -310,8 +337,9 @@ namespace NinjaTrader.NinjaScript.Indicators
                 }
             }
         }
+		*/
 
-        public void f_CalculateAndDraw(int _pointX, float _pointY1, float _pointY2)
+        public void f_CalculateAndDraw(double _pointX, float _pointY1, float _pointY2)
         {
             if ((arrayYF0GannML[0] > _pointY1 && arrayYF0GannML[0] > _pointY2) || (arrayYF0GannML[0] < _pointY1 && arrayYF0GannML[0] < _pointY2))
             {
@@ -327,107 +355,12 @@ namespace NinjaTrader.NinjaScript.Indicators
             // Implement the drawing of a box using NinjaTrader's drawing tools
         }
 
+		
+		
 
-        protected override void OnBarUpdate()
-        {
-            if (CurrentBar < 1) return;
-
-            highPrev = High[0];
-            lowPrev = Low[0];
-
-            if ((pullbackWithCloseBar ? Close[0] : High[0]) > highPrev[1] && Low[0] > lowPrev[1])
-            {
-                f_CalculateAndDraw(Time[0], customLow, customHigh);
-            }
-            else if (High[0] < highPrev[1] && (pullbackWithCloseBar ? Close[0] : Low[0]) < lowPrev[1])
-            {
-                f_CalculateAndDraw(Time[0], customHigh, customLow);
-            }
-            else if ((Close[0] >= highPrev[1] && Low[0] < lowPrev[1]) || (High[0] > highPrev[1] && Close[0] <= lowPrev[1]))
-            {
-                if (Close[0] > Open[0])
-                {
-                    f_CalculateAndDraw(Time[0], customLow, customHigh);
-                }
-                else
-                {
-                    f_CalculateAndDraw(Time[0], customHigh, customLow);
-                }
-            }
-
-            if ((High[0] - minErrorMeasurementPointsHighsLows) <= highPrev[1] && (Low[0] + minErrorMeasurementPointsHighsLows) >= lowPrev[1])
-            {
-                highPrev = highPrev[1];
-                lowPrev = lowPrev[1];
-            }
-
-
-            int confirmed_line_to = arraySXF1GannML[0];
-            int confirmed_line_from = arraySXF1GannML[2];
-            float confirmed_value0 = arraySYF1GannML[0];
-            float confirmed_value1 = arraySYF1GannML[1];
-            float confirmed_value2 = arraySYF1GannML[2];
-            float confirmed_value3 = arraySYF1GannML[3];
-            float confirmed_value4 = arraySYF1GannML[4];
-
-            float mid_level = (confirmed_value1 + confirmed_value2) / 2;
-
-            bool bull_market = (customHigh[1] > confirmed_value1) && (customHigh[1] > confirmed_value2);
-            bool bear_market = (customLow[1] < confirmed_value1) && (customLow[1] < confirmed_value2);
-
-            float bullBosFlipConfirmationCandleValue = (useWicksForFlip ? High[0] : Close[0]) - (useMeasurementPointsErrorsForBosDrawings ? minErrorMeasurementPoints : 0);
-            float bearBosFlipConfirmationCandleValue = (useWicksForFlip ? Low[0] : Close[0]) + (useMeasurementPointsErrorsForBosDrawings ? minErrorMeasurementPoints : 0);
-
-            bool bullBOS = confirmed_value0 > confirmed_value2 && confirmed_value0 > confirmed_value1 && (bullBosFlipConfirmationCandleValue > confirmed_value2) && BarState == BarState.Confirmed;
-            bool bearBOS = confirmed_value0 < confirmed_value2 && confirmed_value0 < confirmed_value1 && (bearBosFlipConfirmationCandleValue < confirmed_value2) && BarState == BarState.Confirmed;
-
-            Color market_direction_color = bull_market ? bullColor : bearColor;
-
-            int prevBullishBOSbar = BarsSince(bullBOS);
-            int prevBearishBOSbar = BarsSince(bearBOS);
-
-            bool bull_market_state = prevBearishBOSbar > prevBullishBOSbar;
-            Color market_state_color = bull_market_state ? bullColor : bearColor;
-
-            // Drawings
-            if (drawMiddleLine && (bullBOS || bearBOS))
-            {
-                int arraySize = arrayLineMiddlePoint.Count;
-                Line lastLineElement = arraySize > 0 ? arrayLineMiddlePoint[arraySize - 1] : null;
-
-                if (lastLineElement == null || lastLineElement.GetX1() != confirmed_line_from)
-                {
-                    Line newLine = new Line(confirmed_line_from, mid_level, confirmed_line_to + middlelineLength * 1000 * Timeframe.ToSeconds(Timeframe.Period), mid_level);
-                    newLine.Color = market_state_color;
-                    newLine.Width = solidLineWidth;
-                    newLine.XLocation = XLocation.BarTime;
-                    arrayLineMiddlePoint.Add(newLine);
-                }
-            }
-
-            if (drawRectangles && (bullBOS || bearBOS))
-            {
-                int left = arraySXF1GannML[2];
-
-                if (left != left[1]) // do not draw the same rectangle x times
-                {
-                    int right = arraySXF1GannML[1];
-                    float top = bull_market ? confirmed_value2 : confirmed_value1;
-                    float bottom = bull_market ? confirmed_value1 : confirmed_value2;
-                    Color boxBgColor = Color.FromArgb(rectangleOpacity, market_state_color.ToArgb());
-
-                    DrawBox(left, top, right, bottom, boxBgColor, boxBgColor);
-                }
-            }
-
-            if (drawMarketDirection)
-            {
-                PlotShape(market_state_color, Shape.Square, Location.Top, Size.Small, "");
-            }
-
-
-        }
-
-        // Other functions...
-    }
+		protected override void OnBarUpdate()
+		{
+			//Add your custom strategy logic here.
+		}
+	}
 }
